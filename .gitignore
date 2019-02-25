@@ -23,5 +23,10 @@
 hs_err_pid*
 
 .*
+<<<<<<< HEAD
 
 !.gitignore
+=======
+*.pdf
+!.gitignore
+>>>>>>> 046f08c647dc3570b070cd7630a0615c030438e0
