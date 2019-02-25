@@ -5,10 +5,10 @@ class PaymentGatewayServer {
 	public static void main(String argv[]) throws Exception {
 
 		System.out.println(" Server is Running  ");
-		ServerSocket mysocket = new ServerSocket(5557);
+		ServerSocket paymentGatewaySocket = new ServerSocket(5557);
 
 		while (true) {
-			Socket connectionSocket = mysocket.accept();
+			Socket connectionSocket = paymentGatewaySocket.accept();
 
 			BufferedReader reader = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
 			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(connectionSocket.getOutputStream()));

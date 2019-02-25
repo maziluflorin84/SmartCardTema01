@@ -5,10 +5,10 @@ class MerchantServer {
 	public static void main(String argv[]) throws Exception {
 
 		System.out.println(" Server is Running  ");
-		ServerSocket mysocket = new ServerSocket(5555);
+		ServerSocket merchantSocket = new ServerSocket(5555);
 
 		while (true) {
-			Socket connectionSocket = mysocket.accept();
+			Socket connectionSocket = merchantSocket.accept();
 
 			BufferedReader reader = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
 			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(connectionSocket.getOutputStream()));

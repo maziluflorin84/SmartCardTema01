@@ -6,12 +6,12 @@ public class ClientClient {
 
 	public static void main(String[] args) {
 		try {
-			Socket socketClient = new Socket("localhost", 5557);
+			Socket clientSocket = new Socket("localhost", 5555);
 			System.out.println("Client: " + "Connection Established");
 
-			BufferedReader reader = new BufferedReader(new InputStreamReader(socketClient.getInputStream()));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 
-			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socketClient.getOutputStream()));
+			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
 			String serverMsg;
 			writer.write("8\r\n");
 			writer.write("10\r\n");
