@@ -3,20 +3,18 @@ import java.net.*;
 import java.security.Key;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 
 class MerchantServer {
 	public static void main(String argv[]) throws Exception {
 		String publicKey = "merchant.pub";
-		File f = new File(publicKey);
-		if (!f.exists() || f.isDirectory()) {
-			FileOutputStream fos = new FileOutputStream(publicKey);
-			KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-			kpg.initialize(2048);
-			KeyPair kp = kpg.generateKeyPair();
-			Key pubKM = kp.getPublic();
-			fos.write(pubKM.getEncoded());
-			fos.close();
-		}
+		String privateKey = "merchant.pvt";
+		
+		File fPub = new File(publicKey);
+		File fPvt = new File(privateKey);
+		
+		if (!fPub.exists() || fPub.isDirectory() || !fPvt.exists() || fPvt.isDirectory())
+			generateKeys(publicKey, privateKey);
 
 		System.out.println(" Merchant is available ");
 		ServerSocket merchantSocket = new ServerSocket(5555);
@@ -55,6 +53,31 @@ class MerchantServer {
 			e.printStackTrace();
 		} finally {
 			merchantSocket.close();
+		}
+	}
+	
+	private static void generateKeys(String publicKey, String privateKey) {
+		KeyPairGenerator kpg;
+		try {
+			kpg = KeyPairGenerator.getInstance("RSA");
+			kpg.initialize(2048);
+			KeyPair kp = kpg.generateKeyPair();
+			
+			FileOutputStream fosPub = new FileOutputStream(publicKey);
+			Key pubKM = kp.getPublic();
+			fosPub.write(pubKM.getEncoded());
+			fosPub.close();
+			
+			FileOutputStream fosPvt = new FileOutputStream(privateKey);
+			Key pvtKM = kp.getPrivate();
+			fosPvt.write(pvtKM.getEncoded());
+			fosPvt.close();
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 }
