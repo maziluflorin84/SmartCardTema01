@@ -52,14 +52,18 @@ class MerchantServer {
 				
 				String data1 = reader.readLine();
 //				while ((data1 = reader.readLine()) != null) {
-					System.out.println("Server: " + data1);
+				System.out.println("Server: " + data1);
 //				}
 				
+				data1 = reader.readLine();
+				System.out.println("Server: The client RSA public key encrypted with AES");
+				System.out.println("Server: " + data1);
+				
 					
-				Base64.Encoder encoder = Base64.getEncoder();
-				String pubKeyString = new String(getPubKM().getEncoded());
-				writer.write(encoder.encodeToString(getPubKM().getEncoded()) + "\r\n");
-				writer.flush();
+//				Base64.Encoder encoder = Base64.getEncoder();
+//				String pubKeyString = new String(getPubKM().getEncoded());
+//				writer.write(encoder.encodeToString(getPubKM().getEncoded()) + "\r\n");
+//				writer.flush();
 				
 //				writer.write("*** Merchant public key sent \n");
 //				writer.flush();

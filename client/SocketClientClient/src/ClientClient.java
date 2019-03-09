@@ -8,14 +8,19 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
 public class ClientClient {
 	private static Key pubKC;
 	private static Key pvtKC;
+	private static Key symK;
 	private static Key pubKM;
 
 	public static void main(String[] args) {
@@ -30,6 +35,9 @@ public class ClientClient {
 			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocketToMerchant.getOutputStream()));
 			
 			
+			writer.write("Client Florin connected\r\n");
+			writer.flush();
+			
 			
 			// generate the RSA public and private keys for the customer
 			generateClientRSAKeys();
@@ -38,13 +46,22 @@ public class ClientClient {
 			generateAESKey();
 			
 			// read the RSA public key from the merchant 
-			getPubKmFromMerchant();
+			getPubKmFromMerchant();			
+			
+			// encrypt the client RSA public key using the AES key
+			Cipher cAES = Cipher.getInstance("AES");
+			SecretKeySpec k = new SecretKeySpec(getSymK().getEncoded(), "AES");
+			cAES.init(Cipher.ENCRYPT_MODE, k);
+			byte[] encPubKC = cAES.doFinal(getPubKC().getEncoded());
+			Base64.Encoder encoder = Base64.getEncoder();
+			System.out.println(encoder.encodeToString(encPubKC));
+			writer.write(encoder.encodeToString(encPubKC) + "\r\n");
+			writer.flush();
 			
 			// encrypt the AES key using the merchant RSA public key
-			
-			
-			// encrypt the client RSA public key using the newly encrypted AES key
-			
+			Cipher cRSA = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			cRSA.init(Cipher.ENCRYPT_MODE, getPubKM());
+			byte[] encSymK = cRSA.doFinal(getSymK().getEncoded());
 			
 //			writer.write("Client Florin connected\r\n");
 //			writer.flush();
@@ -55,9 +72,6 @@ public class ClientClient {
 				
 //			Base64.Encoder encoder = Base64.getEncoder();
 //			System.out.println(encoder.encodeToString(pubKM.getEncoded()));
-			
-			writer.write("Client Florin connected\r\n");
-			writer.flush();
 			
 //			StringBuilder pubKmString = new StringBuilder();
 //			while ((serverMsg = reader.readLine()) != null) {
@@ -87,7 +101,38 @@ public class ClientClient {
 	public static void setPvtKC(Key pvtKC) {
 		ClientClient.pvtKC = pvtKC;
 	}
+	
+	private static void generateClientRSAKeys() throws NoSuchAlgorithmException {
+		KeyPairGenerator kpg;
+		kpg = KeyPairGenerator.getInstance("RSA");
+		kpg.initialize(2048);
+		KeyPair kp = kpg.generateKeyPair();			
+		setPubKC(kp.getPublic());
+		setPvtKC(kp.getPrivate());
+	}
 
+	public static Key getSymK() {
+		return symK;
+	}
+
+	public static void setSymK(Key symK) {
+		ClientClient.symK = symK;
+	}
+	
+	private static void generateAESKey() throws NoSuchAlgorithmException {
+		KeyGenerator generator = KeyGenerator.getInstance("AES");
+		SecretKey key = generator.generateKey();
+		setSymK(key);
+	}
+
+	public static Key getPubKM() {
+		return pubKM;
+	}
+
+	public static void setPubKM(Key pubKM) {
+		ClientClient.pubKM = pubKM;
+	}
+	
 	private static void getPubKmFromMerchant() {
 		Path path = Paths.get("../../merchant/SocketMerchantServer/merchant.pub");
 		byte[] bytes;
@@ -106,30 +151,5 @@ public class ClientClient {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
-
-	public static Key getPubKM() {
-		return pubKM;
-	}
-
-	public static void setPubKM(Key pubKM) {
-		ClientClient.pubKM = pubKM;
-	}
-
-	private static void generateClientRSAKeys() {
-		KeyPairGenerator kpg;
-		try {
-			kpg = KeyPairGenerator.getInstance("RSA");
-			kpg.initialize(2048);
-			KeyPair kp = kpg.generateKeyPair();			
-			setPubKC(kp.getPublic());
-			setPvtKC(kp.getPrivate());
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private static void generateAESKey() {
-		
 	}
 }
