@@ -57,22 +57,34 @@ class MerchantOperations {
 				writer.write("*** Welcome to the merchant ***\r\n");
 				writer.flush();
 				
-				String data1 = reader.readLine();
-				System.out.println("Server: " + data1);
+				String clientName = reader.readLine().trim();
+				System.out.println("\nClient " + clientName + " connected!");
 
 				Base64.Encoder encoder = Base64.getEncoder();
 				Base64.Decoder decoder = Base64.getDecoder();
 				
 //				Reading and decrypting the client AES symmetric key
 				String encSymK = reader.readLine().trim();				
-				System.out.println("Server: The client AES symetric key");
-				System.out.println("Server: \t" + encoder.encodeToString(decryptEncSymK(encSymK, decoder)));
+				byte[] byteSymK = decryptEncSymK(encSymK, decoder);
+				System.out.println(clientName + ": My AES symmetric key is");
+				System.out.println(clientName + ": \t" + encoder.encodeToString(byteSymK));
 
 //				Reading and decrypting the client RSA public key
 				String encPubKC = reader.readLine().trim();
-				System.out.println("Server: The client RSA public key");
-				System.out.println("Server: \t" + encoder.encodeToString(decryptEncPubKC(encPubKC, decoder)));
+				byte[] bytePubKC = decryptEncPubKC(encPubKC, decoder);
+				System.out.println(clientName + ": The client RSA public key");
+				System.out.println(clientName + ": \t" + encoder.encodeToString(bytePubKC));
 				
+//				Check if the first step was completed
+				if (byteSymK == null || bytePubKC == null) {
+					writer.write("error\r\n");
+					writer.flush();
+					System.out.println(clientName + " disconnected!");
+					continue;
+				} else {
+					writer.write("ok\r\n");
+					writer.flush();
+				}
 					
 //				Base64.Encoder encoder = Base64.getEncoder();
 //				String pubKeyString = new String(getPubKM().getEncoded());
@@ -96,6 +108,7 @@ class MerchantOperations {
 //				writer.write("\r\n=== Result is  : " + result);
 //				writer.flush();
 				
+				System.out.println("Connection to " + clientName + " finished!");
 				connectionSocket.close();
 			}
 		} catch (IOException e) {

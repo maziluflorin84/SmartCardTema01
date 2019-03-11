@@ -11,6 +11,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.Scanner;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -22,10 +23,20 @@ public class ClientOperations {
 	private Key pvtKC;
 	private SecretKey symK;
 	private Key pubKM;
+	private String name;
 
 	public ClientOperations(int port) {
+		Scanner sc = new Scanner(System.in);
+		System.out.print("Enter name : ");
+		String userName = sc.nextLine().trim();
+		while (userName.equals("")) {
+			System.out.print("You must enter a name : ");
+			userName = sc.nextLine().trim();
+		}
+		setName(userName);
+		
 		try {
-			ClientSocket clientToM = new ClientSocket("M", port);
+			ClientSocket clientToM = new ClientSocket("Merchant", port);
 			Socket clientSocketToMerchant = clientToM.getClientSocket();
 			
 //			ClientSocket clientToPG = new ClientSocket("PG", 5557);
@@ -35,7 +46,7 @@ public class ClientOperations {
 			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocketToMerchant.getOutputStream()));
 			
 			
-			writer.write("Client Florin connected\r\n");
+			writer.write(getName() + "\r\n");
 			writer.flush();
 			
 			
@@ -50,7 +61,6 @@ public class ClientOperations {
 			
 //			encrypt the client RSA public key using the AES key
 			Cipher cAES = Cipher.getInstance("AES");
-//			SecretKeySpec k = new SecretKeySpec(getSymK().getEncoded(), "AES");
 			cAES.init(Cipher.ENCRYPT_MODE, getSymK());
 			byte[] encPubKC = cAES.doFinal(getPubKC().getEncoded());
 			
@@ -61,16 +71,31 @@ public class ClientOperations {
 			
 			Base64.Encoder encoder = Base64.getEncoder();
 			
-			System.out.println("Client: The AES symetric key");
-			System.out.println("Client: \t" + encoder.encodeToString(getSymK().getEncoded()));
-			
-			System.out.println("Client: The RSA public key");
-			System.out.println("Client: \t" + encoder.encodeToString(getPubKC().getEncoded()));
-			
+			System.out.println("\nThe AES symetric key");
+			System.out.println("\t" + encoder.encodeToString(getSymK().getEncoded()));
 			writer.write(encoder.encodeToString(encSymK) + "\r\n");
 			writer.flush();
+			
+			System.out.println("\nThe RSA public key");
+			System.out.println("\t" + encoder.encodeToString(getPubKC().getEncoded()));
 			writer.write(encoder.encodeToString(encPubKC) + "\r\n");
 			writer.flush();
+			
+//			Welcome message
+			String serverMsg = reader.readLine().trim();
+			System.out.println("\n" + serverMsg);
+			
+//			Check if the first step was completed
+//			If it was not completed, the program stops
+			serverMsg = reader.readLine().trim();
+			if (serverMsg.equals("error")) {
+				System.out.println("\nThere was an error sending the RSA public key");
+				System.out.println("\tOperation aborted!!!");
+				clientSocketToMerchant.close();
+				return;
+			} else if (serverMsg.equals("ok")) {
+				System.out.println("Merchant: RSA public key received");
+			}
 			
 //			writer.write("Client Florin connected\r\n");
 //			writer.flush();
@@ -87,7 +112,9 @@ public class ClientOperations {
 //				pubKmString.append(serverMsg);
 //				System.out.println("Client: " + serverMsg);
 //			}
-//			System.out.println("\n" + pubKmString);
+			
+			System.out.println("Connection to Merchant finished");
+						
 			clientSocketToMerchant.close();
 //			clientSocketToPaymentGateway.close();
 		} catch (Exception e) {
@@ -151,5 +178,13 @@ public class ClientOperations {
 		KeyFactory kf = KeyFactory.getInstance("RSA");
 		setPubKM(kf.generatePublic(ks));
 		
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
 	}
 }

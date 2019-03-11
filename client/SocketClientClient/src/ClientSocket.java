@@ -18,7 +18,7 @@ public class ClientSocket {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		System.out.println("Client: " + "Connection to " + this.connectionTo + " Established");
+		System.out.println("Connection to " + this.connectionTo + " Established");
 	}
 
 	public String getConnectionTo() {
