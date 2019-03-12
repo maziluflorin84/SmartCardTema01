@@ -8,6 +8,8 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
@@ -19,11 +21,12 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 public class ClientOperations {
-	private Key pubKC;
-	private Key pvtKC;
+	private PublicKey pubKC;
+	private PrivateKey pvtKC;
 	private SecretKey symK;
-	private Key pubKM;
+	private PublicKey pubKM;
 	private String name;
+	private int sessionID;
 
 	public ClientOperations(int port) {
 		Scanner sc = new Scanner(System.in);
@@ -38,6 +41,7 @@ public class ClientOperations {
 		try {
 			ClientSocket clientToM = new ClientSocket("Merchant", port);
 			Socket clientSocketToMerchant = clientToM.getClientSocket();
+			Cipher cipherRSA = Cipher.getInstance("RSA");
 			
 //			ClientSocket clientToPG = new ClientSocket("PG", 5557);
 //			Socket clientSocketToPaymentGateway = clientToPG.getClientSocket();
@@ -49,7 +53,8 @@ public class ClientOperations {
 			writer.write(getName() + "\r\n");
 			writer.flush();
 			
-			
+//		First step
+//		preparing and sending the encrypted AES key and the RSA public key
 //			generate the RSA public and private keys for the customer
 			generateClientRSAKeys();
 			
@@ -65,11 +70,11 @@ public class ClientOperations {
 			byte[] encPubKC = cAES.doFinal(getPubKC().getEncoded());
 			
 //			encrypt the AES key using the merchant RSA public key
-			Cipher cRSA = Cipher.getInstance("RSA");
-			cRSA.init(Cipher.ENCRYPT_MODE, getPubKM());
-			byte[] encSymK = cRSA.doFinal(getSymK().getEncoded());
-			
+			cipherRSA.init(Cipher.ENCRYPT_MODE, getPubKM());
+			byte[] encSymK = cipherRSA.doFinal(getSymK().getEncoded());
+
 			Base64.Encoder encoder = Base64.getEncoder();
+			Base64.Decoder decoder = Base64.getDecoder();
 			
 			System.out.println("\nThe AES symetric key");
 			System.out.println("\t" + encoder.encodeToString(getSymK().getEncoded()));
@@ -93,9 +98,22 @@ public class ClientOperations {
 				System.out.println("\tOperation aborted!!!");
 				clientSocketToMerchant.close();
 				return;
-			} else if (serverMsg.equals("ok")) {
-				System.out.println("Merchant: RSA public key received");
 			}
+				
+			System.out.println("Merchant: RSA public key received");
+			
+			
+//		read data from merchant in second step
+			serverMsg = reader.readLine().trim();
+			cipherRSA.init(Cipher.DECRYPT_MODE, getPvtKC());
+			byte[] byteSessionID = cipherRSA.doFinal(serverMsg.getBytes());
+			setSessionID(Integer.valueOf(new String(byteSessionID)));
+			System.out.println("Session ID: " + getSessionID());
+			
+//			serverMsg = reader.readLine().trim();
+//			byte[] byteSignature = cipherRSA.doFinal(serverMsg.getBytes());
+			
+			
 			
 //			writer.write("Client Florin connected\r\n");
 //			writer.flush();
@@ -122,19 +140,19 @@ public class ClientOperations {
 		}
 	}
 	
-	private Key getPubKC() {
+	private PublicKey getPubKC() {
 		return pubKC;
 	}
 
-	private void setPubKC(Key pubKC) {
+	private void setPubKC(PublicKey pubKC) {
 		this.pubKC = pubKC;
 	}
 
-	private Key getPvtKC() {
+	private PrivateKey getPvtKC() {
 		return pvtKC;
 	}
 
-	private void setPvtKC(Key pvtKC) {
+	private void setPvtKC(PrivateKey pvtKC) {
 		this.pvtKC = pvtKC;
 	}
 	
@@ -161,11 +179,11 @@ public class ClientOperations {
 		setSymK(key);
 	}
 
-	private Key getPubKM() {
+	private PublicKey getPubKM() {
 		return pubKM;
 	}
 
-	private void setPubKM(Key pubKM) {
+	private void setPubKM(PublicKey pubKM) {
 		this.pubKM = pubKM;
 	}
 	
@@ -186,5 +204,13 @@ public class ClientOperations {
 
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	private int getSessionID() {
+		return sessionID;
+	}
+
+	private void setSessionID(int sessionID) {
+		this.sessionID = sessionID;
 	}
 }

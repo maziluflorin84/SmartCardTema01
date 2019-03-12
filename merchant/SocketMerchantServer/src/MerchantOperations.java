@@ -9,11 +9,16 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Base64.Decoder;
+import java.util.Random;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -26,10 +31,12 @@ class MerchantOperations {
 	private static final String PUBLICKEY = "merchant.pub";
 	private static final String PRIVATEKEY = "merchant.pvt";
 	
-	private Key pubKM;
-	private Key pvtKM;
-	private Key pubKC;
+	private PublicKey pubKM;
+	private PrivateKey pvtKM;
+	private PublicKey pubKC;
 	private SecretKey symK;
+	private int sessionID;
+	private byte[] signature;
 	
 	public MerchantOperations(int port) {		
 		File fPub = new File(PUBLICKEY);
@@ -41,11 +48,11 @@ class MerchantOperations {
 		try {			
 			merchantSocket = new ServerSocket(port);
 			
-//			Generate Merchant RSA key files if missing 
+//		Generate Merchant RSA key files if missing 
 			if (!fPub.exists() || fPub.isDirectory() || !fPvt.exists() || fPvt.isDirectory())
 				generateMerchantRSAKeys();
 			
-//			Read Merchant RSA keys from files
+//		Read Merchant RSA keys from files
 			readMerchantRSAKeys();
 
 			while (true) {
@@ -63,6 +70,7 @@ class MerchantOperations {
 				Base64.Encoder encoder = Base64.getEncoder();
 				Base64.Decoder decoder = Base64.getDecoder();
 				
+//			Receive data from first step
 //				Reading and decrypting the client AES symmetric key
 				String encSymK = reader.readLine().trim();				
 				byte[] byteSymK = decryptEncSymK(encSymK, decoder);
@@ -81,10 +89,33 @@ class MerchantOperations {
 					writer.flush();
 					System.out.println(clientName + " disconnected!");
 					continue;
-				} else {
-					writer.write("ok\r\n");
-					writer.flush();
 				}
+				
+//			preparing and sending data for the second step
+				writer.write("ok\r\n");
+				writer.flush();
+				
+//				generate Session ID
+				genSessionID();
+				System.out.println("\nSession ID: " + getSessionID());
+				
+//				generate signature
+				genSignature(String.valueOf(getSessionID()));
+				System.out.println("Digital signature: " + Base64.getEncoder().encodeToString(getSignature()));
+				
+//				encrypt sessionID and its signature using the client RSA public key
+				Cipher mRSA = Cipher.getInstance("RSA");
+				mRSA.init(Cipher.ENCRYPT_MODE, getPubKC());
+				byte[] encSessionID = mRSA.doFinal(String.valueOf(getSessionID()).getBytes());
+//				System.out.println(getSignature().length);
+//				byte[] encSignature = mRSA.doFinal(getSignature());
+				
+//				send encrypted values to client
+				writer.write(encoder.encodeToString(encSessionID) + "\r\n");
+				writer.flush();
+//				writer.write(encoder.encodeToString(encSignature) + "\r\n");
+//				writer.flush();
+				
 					
 //				Base64.Encoder encoder = Base64.getEncoder();
 //				String pubKeyString = new String(getPubKM().getEncoded());
@@ -131,6 +162,9 @@ class MerchantOperations {
 		} catch (BadPaddingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		} catch (SignatureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		} finally {
 			try {
 				merchantSocket.close();
@@ -169,27 +203,27 @@ class MerchantOperations {
 		setPvtKM(kf.generatePrivate(ksPvt));		
 	}
 
-	private Key getPubKM() {
+	private PublicKey getPubKM() {
 		return pubKM;
 	}
 
-	private void setPubKM(Key pubKey) {
+	private void setPubKM(PublicKey pubKey) {
 		this.pubKM = pubKey;
 	}
 
-	private Key getPvtKM() {
+	private PrivateKey getPvtKM() {
 		return pvtKM;
 	}
 
-	private void setPvtKM(Key pvtKey) {
+	private void setPvtKM(PrivateKey pvtKey) {
 		this.pvtKM = pvtKey;
 	}
 
-	private Key getPubKC() {
+	private PublicKey getPubKC() {
 		return pubKC;
 	}
 
-	private void setPubKC(Key pubKC) {
+	private void setPubKC(PublicKey pubKC) {
 		this.pubKC = pubKC;
 	}
 	
@@ -209,11 +243,41 @@ class MerchantOperations {
 		return byteSymK;
 	}
 	
-	private byte[] decryptEncPubKC(String encPubKC, Decoder decoder) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+	private byte[] decryptEncPubKC(String encPubKC, Decoder decoder) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidKeySpecException {
 		Cipher cipherAES = Cipher.getInstance("AES");
 		cipherAES.init(Cipher.DECRYPT_MODE, symK);
 		byte[] bytePubKC = cipherAES.doFinal(decoder.decode(encPubKC));
-		setPubKC(new SecretKeySpec(bytePubKC, 0, bytePubKC.length, "RSA"));
+		setPubKC(KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytePubKC)));
 		return bytePubKC;
+	}
+
+	private int getSessionID() {
+		return sessionID;
+	}
+
+	private void setSessionID(int sessionID) {
+		this.sessionID = sessionID;
+	}
+
+	private byte[] getSignature() {
+		return signature;
+	}
+
+	private void setSignature(byte[] signature) {
+		this.signature = signature;
+	}
+	
+	private void genSessionID() {
+		Random rand = new Random();
+		int max = 999;
+		int min = 100;
+		setSessionID(rand.nextInt((max - min) + 1) + min);
+	}
+	
+	private void genSignature(String sId) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+		Signature privateSignature = Signature.getInstance("SHA256withRSA");
+		privateSignature.initSign(getPvtKM());
+		privateSignature.update(sId.getBytes());
+		setSignature(privateSignature.sign());
 	}
 }
